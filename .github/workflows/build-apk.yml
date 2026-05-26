@@ -39,6 +39,10 @@ jobs:
     - name: Install Dependencies
       run: flutter pub get
 
+    # 无损为原生工程补全缺失的 gradlew 编译包装器，并自动生成构建参数
+    - name: Repair Android Platform Files
+      run: flutter create --platforms=android .
+
     - name: Build Debug APK with Flutter
       run: flutter build apk --debug
 
