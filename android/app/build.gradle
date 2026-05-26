@@ -41,3 +41,7 @@ dependencies {
     // HP 官方开源的 jipp 库（用于构建 RFC 2911 / 8011 标准 IPP 二进制字节流）
     implementation 'com.hp.jipp:jipp-core:0.7.15'
 }
+
+flutter {
+    source '../..'
+}
