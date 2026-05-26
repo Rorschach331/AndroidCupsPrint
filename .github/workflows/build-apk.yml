@@ -39,12 +39,15 @@ jobs:
     - name: Install Dependencies
       run: flutter pub get
 
-    # 云端极速补全原生 Android 所需的标准的 gradlew 编译包装器与 Gradle 依赖环境
+    # 云端极速无损补全原生 Android 所需的标准的 gradlew 编译包装器与 Gradle 依赖环境
     - name: Repair Gradle Wrapper
       run: |
-        cd android
-        gradle wrapper --gradle-version 8.0
-        chmod +x gradlew
+        flutter create --platforms=android temp_flutter_project
+        cp temp_flutter_project/android/gradlew android/
+        cp temp_flutter_project/android/gradlew.bat android/
+        cp -r temp_flutter_project/android/gradle android/
+        rm -rf temp_flutter_project
+        chmod +x android/gradlew
 
     - name: Build Debug APK with Flutter
       run: flutter build apk --debug
