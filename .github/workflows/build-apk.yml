@@ -71,6 +71,14 @@ jobs:
         name: CupsPrintClient-Debug-APK
         path: build/app/outputs/flutter-apk/app-debug.apk
 
+    # 总是上传完整的 Flutter 构建日志以供深度调试分析
+    - name: Upload Build Log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: CupsPrintClient-Build-Log
+        path: build_log.txt
+
     # 只有在前置步骤全部成功且推送版本标签时，才自动创建 GitHub Release 并上传编译产物
     - name: Create GitHub Release
       if: success() && startsWith(github.ref, 'refs/tags/')
