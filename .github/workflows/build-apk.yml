@@ -1,0 +1,62 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "master", "main" ]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    # 配置 Flutter 运行环境
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.x'
+        channel: 'stable'
+        cache: true
+
+    # 自动下载 Word 与 Excel 离线解析引擎依赖文件
+    - name: Download Offline JS Engines
+      run: |
+        mkdir -p android/app/src/main/assets
+        curl -L -o android/app/src/main/assets/docx-preview.min.js https://unpkg.com/docx-preview@0.1.15/dist/docx-preview.min.js
+        curl -L -o android/app/src/main/assets/xlsx.full.min.js https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js
+
+    - name: Install Dependencies
+      run: flutter pub get
+
+    - name: Build Debug APK with Flutter
+      run: flutter build apk --debug
+
+    # 归档并上传生成的 Debug APK 产物
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: CupsPrintClient-Debug-APK
+        path: build/app/outputs/flutter-apk/app-debug.apk
+
+    # 推送版本标签时自动创建 GitHub Release 并上传编译产物
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/app/outputs/flutter-apk/app-debug.apk
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

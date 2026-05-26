@@ -1,0 +1,33 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate.json
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The symlink to the flutter sdk
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.dart_tool/
+
+# Flutter/Dart/Pub-related
+build/
+
+# Android-specific
+android/**/local.properties
+android/gen/
+android/local.properties
+android/out/

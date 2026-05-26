@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CupsPrint Word Local Converter</title>
+    <!-- 引入本地 Word 渲染引擎 docx-preview -->
+    <script src="docx-preview.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #container {
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .docx-wrapper {
+            background-color: #FFFFFF !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <script>
+        // 当原生 Android WebView 准备好后，调用此方法传入 Word 的 Base64 二进制数据
+        function convertWordToBase64(base64Data) {
+            try {
+                // 1. 将 Base64 还原为 ArrayBuffer
+                var binaryString = window.atob(base64Data);
+                var len = binaryString.length;
+                var bytes = new Uint8Array(len);
+                for (var i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                var arrayBuffer = bytes.buffer;
+
+                var container = document.getElementById("container");
+                container.innerHTML = ""; // 清空容器
+
+                // 2. 调用 docx-preview 引擎，将 Word 转换为 HTML DOM
+                docx.renderAsync(arrayBuffer, container, null, {
+                    inWrapper: false,
+                    ignoreWidth: false,
+                    ignoreHeight: false,
+                    debug: false
+                }).then(function() {
+                    // 3. 渲染完成后，通知 Android 原生客户端，已可进行静默打印导出 PDF
+                    if (window.AndroidConverterBridge) {
+                        window.AndroidConverterBridge.onRenderFinished();
+                    }
+                }).catch(function(err) {
+                    if (window.AndroidConverterBridge) {
+                        window.AndroidConverterBridge.onRenderFailed(err.toString());
+                    }
+                });
+            } catch(e) {
+                if (window.AndroidConverterBridge) {
+                    window.AndroidConverterBridge.onRenderFailed(e.toString());
+                }
+            }
+        }
+    </script>
+</body>
+</html>

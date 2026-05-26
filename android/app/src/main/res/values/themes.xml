@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 极简 Material 3 主题支持，确保 AndroidManifest.xml 正常编译通过 -->
+    <style name="Theme.CupsPrint" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@android:color/holo_blue_light</item>
+        <item name="android:statusBarColor">?attr/colorPrimary</item>
+    </style>
+</resources>

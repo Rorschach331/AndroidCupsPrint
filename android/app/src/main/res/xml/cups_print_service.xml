@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 原生 PrintService 属性声明 -->
+<print-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:vendor="CupsPrint Team"
+    android:settingsActivity="com.cups.print.MainActivity"
+    android:addPrintersActivity="com.cups.print.MainActivity"
+    android:description="@string/print_service_description" />

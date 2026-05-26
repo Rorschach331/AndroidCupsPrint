@@ -1,0 +1,38 @@
+name: cups_print_client
+description: A Futuristic Dark Nebula CUPS Mobile Print Client built with Flutter & Kotlin Native.
+version: 1.0.0+1
+
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI 与科幻微动画支持
+  flutter_spinkit: ^5.2.0
+
+  # PDF 高清预览与双指平滑手势缩放
+  pdfx: ^2.4.0
+
+  # 本地 PDF 文件生成与图像转码 Canvas 库
+  pdf: ^3.10.8
+
+  # 系统参数持久化（存储服务器IP、端口、Queue名等）
+  shared_preferences: ^2.2.2
+
+  # 拦截微信/QQ等第三方一键分享 PDF 文件
+  receive_sharing_intent: ^1.4.5
+
+  # 文件系统路径解析
+  path_provider: ^2.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

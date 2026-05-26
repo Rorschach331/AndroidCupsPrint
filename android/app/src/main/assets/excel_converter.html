@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CupsPrint Excel Local Converter</title>
+    <!-- 引入本地 Excel 解析引擎 SheetJS -->
+    <script src="xlsx.full.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 30px;
+            font-size: 13px;
+        }
+        th, td {
+            border: 1px solid #D0D0D0;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #F0F0F0;
+            font-weight: bold;
+        }
+        .sheet-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333333;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #00F2FE;
+            padding-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <script>
+        // 当原生 Android WebView 准备好后，调用此方法传入 Excel 的 Base64 二进制数据
+        function convertExcelToBase64(base64Data) {
+            try {
+                // 1. 将 Base64 还原为 ArrayBuffer/Uint8Array
+                var binaryString = window.atob(base64Data);
+                var len = binaryString.length;
+                var bytes = new Uint8Array(len);
+                for (var i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+
+                // 2. 调用 SheetJS 引擎在本地解析 Excel 二进制数据
+                var workbook = XLSX.read(bytes, { type: 'array' });
+                var container = document.getElementById("container");
+                container.innerHTML = ""; // 清空容器
+
+                // 3. 遍历所有的 Sheet，转换并拼接为 HTML 表格进行展示
+                workbook.SheetNames.forEach(function(sheetName) {
+                    var sheet = workbook.Sheets[sheetName];
+                    var htmlTable = XLSX.utils.sheet_to_html(sheet);
+
+                    // 包装 sheet 标题
+                    var titleDiv = document.createElement("div");
+                    titleDiv.className = "sheet-title";
+                    titleDiv.innerText = "📄 工作表: " + sheetName;
+                    container.appendChild(titleDiv);
+
+                    var tableWrapper = document.createElement("div");
+                    tableWrapper.innerHTML = htmlTable;
+                    container.appendChild(tableWrapper);
+                });
+
+                // 4. 解析渲染完成后，通知 Android 原生客户端进行静默打印导出 PDF
+                if (window.AndroidConverterBridge) {
+                    window.AndroidConverterBridge.onRenderFinished();
+                }
+            } catch(e) {
+                if (window.AndroidConverterBridge) {
+                    window.AndroidConverterBridge.onRenderFailed(e.toString());
+                }
+            }
+        }
+    </script>
+</body>
+</html>

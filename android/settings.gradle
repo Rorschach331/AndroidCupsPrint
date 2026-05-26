@@ -1,0 +1,43 @@
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        def file = new File(settingsDir, "local.properties")
+        if (file.exists()) {
+            properties.load(file.newDataInputStream())
+        }
+        def sdkPath = properties.getProperty("flutter.sdk")
+        if (sdkPath == null) {
+            // 云端 GitHub Actions 环境中会自动读取环境变量
+            sdkPath = System.getenv("FLUTTER_ROOT")
+        }
+        if (sdkPath == null) {
+            // 提供默认路径或回退
+            sdkPath = "C:/flutter"
+        }
+        return sdkPath
+    }()
+
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-gradle-plugin" version "1.0.0" apply false
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+rootProject.name = "CupsPrintClient"
+include ':app'

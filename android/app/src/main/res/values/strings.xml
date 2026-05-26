@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CupsPrint</string>
+    <string name="print_service_description">CupsPrint 远程云打印服务：支持通过 WPS、Office 系统打印直连您的树莓派或远程 CUPS 打印机，实现本地无损高保真 Office 与 PDF 打印。</string>
+</resources>
