@@ -13,6 +13,10 @@
         android:label="CupsPrint"
         android:supportsRtl="true"
         android:theme="@style/Theme.CupsPrint">
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
         
         <activity
             android:name=".MainActivity"
