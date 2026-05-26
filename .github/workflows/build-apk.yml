@@ -50,7 +50,19 @@ jobs:
         chmod +x android/gradlew
 
     - name: Build Debug APK with Flutter
-      run: flutter build apk --debug
+      run: |
+        flutter build apk --debug -v > build_log.txt 2>&1
+
+    # 如果编译失败，提取日志中最后 150 行的核心报错并写入到 GitHub Job Summary 提供无感深度诊断
+    - name: Diagnostics on Failure
+      if: failure()
+      run: |
+        echo "### ❌ Flutter 编译失败深度诊断报告" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`text" >> $GITHUB_STEP_SUMMARY
+        tail -n 150 build_log.txt >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        cat build_log.txt
+        exit 1
 
     # 归档并上传生成的 Debug APK 产物
     - name: Upload APK Artifact
