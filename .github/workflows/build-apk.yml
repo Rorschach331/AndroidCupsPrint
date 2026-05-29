@@ -52,13 +52,13 @@ jobs:
     - name: Setup Gradle Wrapper
       run: |
         mkdir -p android/gradle/wrapper
-        curl -sLo android/gradlew https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew
-        curl -sLo android/gradlew.bat https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew.bat
-        curl -sLo android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar
+        curl -sLo android/gradlew https://raw.githubusercontent.com/gradle/gradle/v8.0.0/gradlew
+        curl -sLo android/gradlew.bat https://raw.githubusercontent.com/gradle/gradle/v8.0.0/gradlew.bat
+        curl -sLo android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.0.0/gradle/wrapper/gradle-wrapper.jar
         chmod +x android/gradlew
         echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
         echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.0-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
 
     - name: Build APK
       id: build
