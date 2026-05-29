@@ -37,6 +37,18 @@ jobs:
     - name: Install Dependencies
       run: flutter pub get
 
+    - name: Debug Plugin Files
+      run: |
+        echo "=== .flutter-plugins ==="
+        cat .flutter-plugins || echo "(not found)"
+        echo ""
+        echo "=== .flutter-plugins-dependencies (head) ==="
+        head -20 .flutter-plugins-dependencies || echo "(not found)"
+        echo ""
+        echo "=== pub cache check ==="
+        ls ~/.pub-cache/hosted/pub.dev/ | grep -E "receive_sharing|shared_pref|pdfx|path_provider" || echo "checking alternate paths"
+        find ~/.pub-cache -maxdepth 3 -name "receive_sharing_intent*" -type d 2>/dev/null | head -5
+
     - name: Setup Gradle Wrapper
       run: |
         mkdir -p android/gradle/wrapper
