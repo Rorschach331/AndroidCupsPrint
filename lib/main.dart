@@ -146,7 +146,7 @@ class _MainConsolePageState extends State<MainConsolePage> {
   // 初始化微信/QQ分享监听机制
   void _initSharingIntent() {
     // 1. 用于应用在后台运行被唤醒时的分享事件监听
-    _intentDataStreamSubscription = ReceiveSharingIntent.getMediaStream().listen((value) {
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen((value) {
       if (value.isNotEmpty && _isAcceptableFile(value.first.path)) {
         _handleSharedFile(value.first.path);
       }
@@ -155,10 +155,11 @@ class _MainConsolePageState extends State<MainConsolePage> {
     });
 
     // 2. 用于应用进程彻底关闭时，被分享拉起那一刻的冷启动文件捕获
-    ReceiveSharingIntent.getInitialMedia().then((value) {
+    ReceiveSharingIntent.instance.getInitialMedia().then((value) {
       if (value.isNotEmpty && _isAcceptableFile(value.first.path)) {
         _handleSharedFile(value.first.path);
       }
+      ReceiveSharingIntent.instance.reset();
     });
   }
 
@@ -645,7 +646,6 @@ class _MainConsolePageState extends State<MainConsolePage> {
                                   style: TextButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     minimumSize: Size.zero,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   ),
                                 ),
                         ],
@@ -773,7 +773,7 @@ class _MainConsolePageState extends State<MainConsolePage> {
                               return Padding(
                                 padding: const EdgeInsets.only(right: 8),
                                 child: InkWell(
-                                  onPressed: () {
+                                  onTap: () {
                                     setState(() {
                                       _queueController.text = name;
                                     });
@@ -1211,7 +1211,6 @@ class _MainConsolePageState extends State<MainConsolePage> {
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
           minimumSize: Size.zero,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           backgroundColor: const Color(0x15FFFFFF),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),

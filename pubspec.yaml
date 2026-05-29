@@ -29,6 +29,9 @@ dependencies:
   # 文件系统路径解析
   path_provider: ^2.1.1
 
+dependency_overrides:
+  flutter_spinkit: 5.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
