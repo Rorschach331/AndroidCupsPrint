@@ -19,8 +19,9 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.hp.jipp.encoding.IppOutputStream
 import com.hp.jipp.encoding.IppPacket
-import com.hp.jipp.model.BinaryGroup
+import com.hp.jipp.encoding.Tag
 import com.hp.jipp.model.Operation
 import com.hp.jipp.model.Types
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +32,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import android.graphics.Bitmap
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URI
 import java.util.concurrent.TimeUnit
@@ -405,6 +409,7 @@ class MainActivity : FlutterActivity() {
      * 调用系统打印适配器 PrintDocumentAdapter 的 onLayout 与 onWrite 回调，
      * 将 WebView 的网页排版结果输出保存为本地 PDF 物理文件。
      */
+    @Suppress("PRIVATE_CONSTRUCTOR_CALL")
     private fun saveWebViewToPdf(webView: WebView, outputFile: File, onComplete: (Boolean) -> Unit) {
         val adapter = webView.createPrintDocumentAdapter("OfficeConvertJob")
         val attributes = PrintAttributes.Builder()
@@ -469,12 +474,16 @@ class MainActivity : FlutterActivity() {
         
         // 1. 组装标准 IPP Get-Printer-Attributes 动作报文
         val packet = IppPacket.builder(Operation.getPrinterAttributes)
-            .put(BinaryGroup.operationAttributes, Types.attributesCharset, "utf-8")
-            .put(BinaryGroup.operationAttributes, Types.attributesNaturalLanguage, "en-us")
-            .put(BinaryGroup.operationAttributes, Types.printerUri, URI.create(printerUrl))
+            .putOperationAttributes(
+                Types.attributesCharset.of("utf-8"),
+                Types.attributesNaturalLanguage.of("en-us"),
+                Types.printerUri.of(URI.create(printerUrl))
+            )
             .build()
 
-        val ippBytes = packet.write()
+        val headerStream = ByteArrayOutputStream()
+        IppOutputStream(headerStream).write(packet)
+        val ippBytes = headerStream.toByteArray()
 
         // 2. 发送单播请求
         val client = OkHttpClient.Builder()
@@ -491,14 +500,14 @@ class MainActivity : FlutterActivity() {
                 throw Exception("HTTP ${response.code}: ${response.message}")
             }
             val responseBytes = response.body?.bytes() ?: throw Exception("返回为空")
-            val responsePacket = IppPacket.read(responseBytes)
+            val responsePacket = IppPacket.read(ByteArrayInputStream(responseBytes))
 
             var state = "unknown"
             var reasons = "none"
 
             // 3. 解析 printer-state 和 printer-state-reasons 硬件诊断属性
             for (group in responsePacket.attributeGroups) {
-                if (group.tag == BinaryGroup.printerAttributes) {
+                if (group.tag == Tag.printerAttributes) {
                     val stateAttr = group[Types.printerState]
                     if (stateAttr != null && stateAttr.isNotEmpty()) {
                         state = stateAttr.first().toString() // idle, processing, stopped
@@ -525,13 +534,17 @@ class MainActivity : FlutterActivity() {
         
         // 组装标准 IPP Get-Jobs 请求报文获取当前活跃任务
         val packet = IppPacket.builder(Operation.getJobs)
-            .put(BinaryGroup.operationAttributes, Types.attributesCharset, "utf-8")
-            .put(BinaryGroup.operationAttributes, Types.attributesNaturalLanguage, "en-us")
-            .put(BinaryGroup.operationAttributes, Types.printerUri, URI.create(printerUrl))
-            .put(BinaryGroup.operationAttributes, Types.whichJobs, "not-completed") // 只获取未完成的排队任务
+            .putOperationAttributes(
+                Types.attributesCharset.of("utf-8"),
+                Types.attributesNaturalLanguage.of("en-us"),
+                Types.printerUri.of(URI.create(printerUrl)),
+                Types.whichJobs.of("not-completed")
+            )
             .build()
 
-        val ippBytes = packet.write()
+        val headerStream = ByteArrayOutputStream()
+        IppOutputStream(headerStream).write(packet)
+        val ippBytes = headerStream.toByteArray()
 
         val client = OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
@@ -547,14 +560,14 @@ class MainActivity : FlutterActivity() {
                 throw Exception("HTTP ${response.code}: ${response.message}")
             }
             val responseBytes = response.body?.bytes() ?: throw Exception("返回为空")
-            val responsePacket = IppPacket.read(responseBytes)
+            val responsePacket = IppPacket.read(ByteArrayInputStream(responseBytes))
 
             var pendingJobsCount = 0
             var processingJobName = "无活跃任务"
 
             // 遍历属性组，计算排队中的 Job 数量并提取当前正在执行的任务名
             for (group in responsePacket.attributeGroups) {
-                if (group.tag == BinaryGroup.jobAttributes) {
+                if (group.tag == Tag.jobAttributes) {
                     val jobStateAttr = group[Types.jobState]
                     val jobNameAttr = group[Types.jobName]
                     if (jobStateAttr != null && jobStateAttr.isNotEmpty()) {
@@ -602,22 +615,26 @@ class MainActivity : FlutterActivity() {
         return translated.joinToString(" | ")
     }
 
+    private data class PrintResult(val success: Boolean, val message: String? = null)
+
     private fun executeIppPrint(pdfFile: File, printerUrl: String, copiesNum: Int, duplex: Boolean): PrintResult {
         return try {
-            val packetBuilder = IppPacket.builder(Operation.printJob)
-                .put(BinaryGroup.operationAttributes, Types.attributesCharset, "utf-8")
-                .put(BinaryGroup.operationAttributes, Types.attributesNaturalLanguage, "en-us")
-                .put(BinaryGroup.operationAttributes, Types.printerUri, URI.create(printerUrl))
-                .put(BinaryGroup.operationAttributes, Types.jobName, pdfFile.name)
-                .put(BinaryGroup.jobAttributes, Types.copies, copiesNum)
-            
-            if (duplex) {
-                packetBuilder.put(BinaryGroup.jobAttributes, Types.sides, "two-sided-long-edge")
-            } else {
-                packetBuilder.put(BinaryGroup.jobAttributes, Types.sides, "one-sided")
-            }
+            val packet = IppPacket.builder(Operation.printJob)
+                .putOperationAttributes(
+                    Types.attributesCharset.of("utf-8"),
+                    Types.attributesNaturalLanguage.of("en-us"),
+                    Types.printerUri.of(URI.create(printerUrl)),
+                    Types.jobName.of(pdfFile.name)
+                )
+                .putJobAttributes(
+                    Types.copies.of(copiesNum),
+                    Types.sides.of(if (duplex) "two-sided-long-edge" else "one-sided")
+                )
+                .build()
 
-            val ippHeaderBytes = packetBuilder.build().write()
+            val headerStream = ByteArrayOutputStream()
+            IppOutputStream(headerStream).write(packet)
+            val ippHeaderBytes = headerStream.toByteArray()
 
             val pdfBytes = pdfFile.readBytes()
             val payload = ByteArray(ippHeaderBytes.size + pdfBytes.size)
@@ -653,12 +670,16 @@ class MainActivity : FlutterActivity() {
         val serverUrl = "http://$ip:$port/"
         
         val packet = IppPacket.builder(Operation.getPrinters)
-            .put(BinaryGroup.operationAttributes, Types.attributesCharset, "utf-8")
-            .put(BinaryGroup.operationAttributes, Types.attributesNaturalLanguage, "en-us")
-            .put(BinaryGroup.operationAttributes, Types.printerUri, URI.create(serverUrl))
+            .putOperationAttributes(
+                Types.attributesCharset.of("utf-8"),
+                Types.attributesNaturalLanguage.of("en-us"),
+                Types.printerUri.of(URI.create(serverUrl))
+            )
             .build()
 
-        val ippBytes = packet.write()
+        val headerStream = ByteArrayOutputStream()
+        IppOutputStream(headerStream).write(packet)
+        val ippBytes = headerStream.toByteArray()
 
         val client = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -678,11 +699,11 @@ class MainActivity : FlutterActivity() {
             }
             val responseBytes = response.body?.bytes() ?: throw Exception("响应正文为空")
             
-            val responsePacket = IppPacket.read(responseBytes)
+            val responsePacket = IppPacket.read(ByteArrayInputStream(responseBytes))
             val printers = mutableListOf<String>()
             
             for (group in responsePacket.attributeGroups) {
-                if (group.tag == BinaryGroup.printerAttributes) {
+                if (group.tag == Tag.printerAttributes) {
                     val nameAttr = group[Types.printerName]
                     if (nameAttr != null && nameAttr.isNotEmpty()) {
                         printers.add(nameAttr.first().toString())
@@ -712,7 +733,10 @@ class MainActivity : FlutterActivity() {
                     val docPage = pdfDoc.startPage(pageInfo)
                     
                     // 矢量级重画 Canvas 图像
-                    page.render(docPage.canvas, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                    val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+                    page.render(bitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                    docPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                    bitmap.recycle()
                     pdfDoc.finishPage(docPage)
                     page.close()
                 }

@@ -1,17 +1,18 @@
 package com.cups.print
 
 import android.content.Context
+import android.os.ParcelFileDescriptor
 import android.print.PrintAttributes
 import android.print.PrinterCapabilitiesInfo
 import android.print.PrinterId
 import android.print.PrinterInfo
-import android.print.PageRange
 import android.printservice.PrintJob
 import android.printservice.PrintService
 import android.printservice.PrinterDiscoverySession
 import android.util.Log
+import com.hp.jipp.encoding.IppOutputStream
 import com.hp.jipp.encoding.IppPacket
-import com.hp.jipp.model.BinaryGroup
+import com.hp.jipp.encoding.Tag
 import com.hp.jipp.model.Operation
 import com.hp.jipp.model.Types
 import kotlinx.coroutines.CoroutineScope
@@ -59,8 +60,8 @@ class CupsPrintService : PrintService() {
                 Log.d(TAG, "拦截到打印参数 -> 份数: $copies, 是否双面: $isDuplex")
 
                 // 4. 提取 WPS 在手机本地高保真渲染好的 PDF 二进制流
-                val inputStream: InputStream = printJob.document.data ?: throw Exception("WPS排版渲染流为空")
-                val pdfBytes = readInputStreamToByteArray(inputStream)
+                val pfd = printJob.document.data ?: throw Exception("WPS排版渲染流为空")
+                val pdfBytes = readInputStreamToByteArray(ParcelFileDescriptor.AutoCloseInputStream(pfd))
 
                 // 5. 执行 IPP 字节流的打包与上传
                 val printerUrl = "http://$ip:$port/printers/$queue"
@@ -107,20 +108,22 @@ class CupsPrintService : PrintService() {
     private fun executeIppStreamPrint(pdfBytes: ByteArray, jobName: String, printerUrl: String, copiesNum: Int, duplex: Boolean): Boolean {
         return try {
             // A. 构建 RFC 规范标准的 IPP 二进制控制头
-            val packetBuilder = IppPacket.builder(Operation.printJob)
-                .put(BinaryGroup.operationAttributes, Types.attributesCharset, "utf-8")
-                .put(BinaryGroup.operationAttributes, Types.attributesNaturalLanguage, "en-us")
-                .put(BinaryGroup.operationAttributes, Types.printerUri, URI.create(printerUrl))
-                .put(BinaryGroup.operationAttributes, Types.jobName, jobName)
-                .put(BinaryGroup.jobAttributes, Types.copies, copiesNum)
-            
-            if (duplex) {
-                packetBuilder.put(BinaryGroup.jobAttributes, Types.sides, "two-sided-long-edge")
-            } else {
-                packetBuilder.put(BinaryGroup.jobAttributes, Types.sides, "one-sided")
-            }
+            val packet = IppPacket.builder(Operation.printJob)
+                .putOperationAttributes(
+                    Types.attributesCharset.of("utf-8"),
+                    Types.attributesNaturalLanguage.of("en-us"),
+                    Types.printerUri.of(URI.create(printerUrl)),
+                    Types.jobName.of(jobName)
+                )
+                .putJobAttributes(
+                    Types.copies.of(copiesNum),
+                    Types.sides.of(if (duplex) "two-sided-long-edge" else "one-sided")
+                )
+                .build()
 
-            val ippHeaderBytes = packetBuilder.build().write()
+            val headerStream = ByteArrayOutputStream()
+            IppOutputStream(headerStream).write(packet)
+            val ippHeaderBytes = headerStream.toByteArray()
 
             // B. 合并控制头和 WPS 渲染的高清 PDF 数据体
             val payload = ByteArray(ippHeaderBytes.size + pdfBytes.size)
