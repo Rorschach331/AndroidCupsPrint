@@ -71,17 +71,20 @@ jobs:
         exit ${PIPESTATUS[0]}
 
     - name: Extract Errors
-      if: failure()
+      if: steps.build.outcome == 'failure'
       run: |
         {
-          echo "### Errors"
+          echo "### Build Errors"
           echo '```'
-          grep -i -E "FAILURE:|BUILD FAILED|A failure occurred|Could not isolate" build.log | head -30
+          grep -i -E "FAILURE:|BUILD FAILED|A failure occurred|Could not isolate|Plugin project|afterEvaluate|Unzipping|Error:" build.log 2>/dev/null | head -50
           echo ''
-          echo '--- tail 80 ---'
-          tail -80 build.log
+          echo '--- tail 80 lines ---'
+          tail -80 build.log 2>/dev/null
           echo '```'
         } >> $GITHUB_STEP_SUMMARY
+        echo "::group::Full Build Log"
+        cat build.log
+        echo "::endgroup::"
 
     - name: Upload Log
       if: always()
