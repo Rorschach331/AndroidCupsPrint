@@ -34,19 +34,29 @@ jobs:
         curl -sLo android/app/src/main/assets/docx-preview.min.js https://unpkg.com/docx-preview@0.1.15/dist/docx-preview.min.js
         curl -sLo android/app/src/main/assets/xlsx.full.min.js https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js
 
-    - name: Generate Gradle Wrapper
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: 8.1.1
+    - name: Install Dependencies
+      run: flutter pub get
+
+    - name: Setup Gradle Wrapper
+      run: |
+        mkdir -p android/gradle/wrapper
+        curl -sLo android/gradlew https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradlew
+        curl -sLo android/gradlew.bat https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradlew.bat
+        curl -sLo android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradle/wrapper/gradle-wrapper.jar
+        chmod +x android/gradlew
+        echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
+        echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.1.1-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "networkTimeout=10000" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "validateDistributionUrl=true" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
 
     - name: Build APK
       id: build
       continue-on-error: true
       shell: bash
       run: |
-        # 生成 wrapper 到 android/ 目录
-        cd android && gradle wrapper --gradle-version 8.1.1 && cd ..
-        flutter pub get
         flutter build apk --debug 2>&1 | tee build.log
         exit ${PIPESTATUS[0]}
 
