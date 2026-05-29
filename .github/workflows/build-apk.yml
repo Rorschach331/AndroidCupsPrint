@@ -40,14 +40,16 @@ jobs:
     - name: Debug Plugin Files
       run: |
         echo "=== .flutter-plugins ==="
-        cat .flutter-plugins || echo "(not found)"
+        if [ -f .flutter-plugins ]; then cat .flutter-plugins; else echo "(not found)"; fi
         echo ""
-        echo "=== .flutter-plugins-dependencies (head) ==="
-        head -20 .flutter-plugins-dependencies || echo "(not found)"
+        echo "=== .flutter-plugins-dependencies ==="
+        if [ -f .flutter-plugins-dependencies ]; then python3 -c "import json,sys; d=json.load(open(sys.argv[1])); [print(f'  {p[\"name\"]}: {p[\"path\"]} (exists: {\"yes\" if __import__(\"os\").path.exists(p[\"path\"]) else \"NO\"})') for p in d.get('plugins',{}).get('android',[])]" .flutter-plugins-dependencies 2>/dev/null || head -30 .flutter-plugins-dependencies; else echo "(not found)"; fi
         echo ""
-        echo "=== pub cache check ==="
-        ls ~/.pub-cache/hosted/pub.dev/ | grep -E "receive_sharing|shared_pref|pdfx|path_provider" || echo "checking alternate paths"
-        find ~/.pub-cache -maxdepth 3 -name "receive_sharing_intent*" -type d 2>/dev/null | head -5
+        echo "=== pub cache paths ==="
+        ls ~/.pub-cache/hosted/pub.dev/ 2>/dev/null | grep -E "receive_sharing|shared_pref|pdfx|path_provider|device_info" || echo "(not matching)"
+        echo ""
+        echo "=== android/ in pub cache ==="
+        find ~/.pub-cache -maxdepth 4 -path "*/android/build.gradle" 2>/dev/null | head -10
 
     - name: Setup Gradle Wrapper
       run: |
