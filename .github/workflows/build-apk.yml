@@ -49,6 +49,8 @@ jobs:
         cp -r _tmp/android/gradle/wrapper android/gradle/
         chmod +x android/gradlew
         rm -rf _tmp
+        # flutter create 生成的是 Gradle 7.6.3，但 AGP 8.1.4 需要 8.0+
+        sed -i 's|gradle-.*-bin.zip|gradle-8.1.1-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
 
     - name: Build APK
       id: build
