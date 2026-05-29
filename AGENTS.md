@@ -56,7 +56,7 @@ flutter build apk --debug    # 仅调试版，release 未配置签名
 | minSdk | 26 |
 | targetSdk / compileSdk | 34 |
 | AGP | 8.1.4 |
-| Kotlin | 1.9.0 |
+| Kotlin | 1.9.22 |
 | JDK | 17 |
 
 依赖：OkHttp 4.12.0、jipp-core 0.7.15、core-ktx 1.12.0。
