@@ -46,11 +46,15 @@ jobs:
       run: |
         flutter create --platforms=android _tmp
         cp _tmp/android/gradlew _tmp/android/gradlew.bat android/
-        cp -r _tmp/android/gradle/wrapper android/gradle/
         chmod +x android/gradlew
+        mkdir -p android/gradle/wrapper
+        cp _tmp/android/gradle/wrapper/gradle-wrapper.jar android/gradle/wrapper/
         rm -rf _tmp
-        # flutter create 生成的是 Gradle 7.6.3，但 AGP 8.1.4 需要 8.0+
-        sed -i 's|gradle-.*-bin.zip|gradle-8.1.1-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
+        echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
+        echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.1.1-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
 
     - name: Build APK
       id: build
