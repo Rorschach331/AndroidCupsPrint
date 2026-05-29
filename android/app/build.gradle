@@ -39,6 +39,7 @@ android {
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'com.google.android.material:material:1.11.0'
     
     // OkHttp 网络客户端（用于承载 IPP 大文件传输）
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'

@@ -28,6 +28,10 @@ jobs:
 
     - run: flutter doctor -v
 
+    - name: Install Android SDK 34
+      run: |
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-34" "build-tools;34.0.0" 2>/dev/null || echo "SDK 34 already installed or sdkmanager not available"
+
     - name: Download JS Engines
       run: |
         mkdir -p android/app/src/main/assets
