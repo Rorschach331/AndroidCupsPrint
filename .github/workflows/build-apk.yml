@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*"
+  # 允许手动触发调试
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,15 +23,16 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # 配置 Flutter 运行环境
-    - name: Set up Flutter
+    - name: Set up Flutter 3.19
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.19.x'
         channel: 'stable'
         cache: true
 
-    # 自动下载 Word 与 Excel 离线解析引擎依赖文件
+    - name: Flutter Doctor
+      run: flutter doctor -v
+
     - name: Download Offline JS Engines
       run: |
         mkdir -p android/app/src/main/assets
@@ -39,48 +42,98 @@ jobs:
     - name: Install Dependencies
       run: flutter pub get
 
-    # 云端极速无损补全原生 Android 所需的标准的 gradlew 编译包装器与 Gradle 依赖环境
-    - name: Repair Gradle Wrapper
+    # Gradle 缓存加速后续构建
+    - name: Cache Gradle
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle.properties') }}
+        restore-keys: |
+          gradle-${{ runner.os }}-
+
+    # 显式写入 Gradle Wrapper（不再依赖 flutter create 生成，避免版本不匹配）
+    - name: Setup Gradle Wrapper
       run: |
-        flutter create --platforms=android temp_flutter_project
-        cp -n temp_flutter_project/android/gradlew android/ || true
-        cp -n temp_flutter_project/android/gradlew.bat android/ || true
         mkdir -p android/gradle/wrapper
-        cp -n temp_flutter_project/android/gradle/wrapper/gradle-wrapper.jar android/gradle/wrapper/ || true
-        cp -n temp_flutter_project/android/gradle/wrapper/gradle-wrapper.properties android/gradle/wrapper/ || true
-        rm -rf temp_flutter_project
+        cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+EOF
+        # 下载 gradle-wrapper.jar（约 60KB，不依赖本地安装）
+        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar" \
+          -o android/gradle/wrapper/gradle-wrapper.jar
+        # 生成 gradlew 脚本
+        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew" \
+          -o android/gradlew
+        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew.bat" \
+          -o android/gradlew.bat
         chmod +x android/gradlew
 
-    - name: Build Debug APK with Flutter
+    # 分两步构建：先分离 Gradle 错误到单独文件
+    - name: Build Debug APK
+      id: build
+      continue-on-error: true
       run: |
-        flutter build apk --debug -v > build_log.txt 2>&1
+        flutter build apk --debug -v 2>&1 | tee build_log_full.txt
+        # 退出码以 flutter 为准（pipe 会吞掉失败码）
+        exit ${PIPESTATUS[0]}
 
-    # 如果编译失败，提取日志中最后 150 行的核心报错并写入到 GitHub Job Summary 提供无感深度诊断
-    - name: Diagnostics on Failure
-      if: failure()
+    # 智能错误提取：查找真正的原因行
+    - name: Extract Build Errors
+      if: always()
       run: |
-        echo "### ❌ Flutter 编译失败深度诊断报告" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`text" >> $GITHUB_STEP_SUMMARY
-        tail -n 150 build_log.txt >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        exit 1
+        echo "## 📋 构建诊断报告" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
 
-    # 归档并上传生成的 Debug APK 产物
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: CupsPrintClient-Debug-APK
-        path: build/app/outputs/flutter-apk/app-debug.apk
+        if [ -f build_log_full.txt ]; then
+          echo "### ❌ 编译错误摘要" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          # 提取常见的 Gradle/AGP/编译报错行
+          grep -n -i "FAILURE:" build_log_full.txt | head -30 >> $GITHUB_STEP_SUMMARY || true
+          grep -n -i "BUILD FAILED" build_log_full.txt | head -5 >> $GITHUB_STEP_SUMMARY || true
+          grep -n -i "A failure occurred" build_log_full.txt | head -10 >> $GITHUB_STEP_SUMMARY || true
+          grep -n -i "error:" build_log_full.txt | grep -v "warning:" | head -20 >> $GITHUB_STEP_SUMMARY || true
+          grep -n -i "Could not" build_log_full.txt | head -15 >> $GITHUB_STEP_SUMMARY || true
+          grep -n -i "Unresolved" build_log_full.txt | head -10 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
-    # 总是上传完整的 Flutter 构建日志以供深度调试分析
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 完整日志尾部（最后 80 行）" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -80 build_log_full.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        else
+          echo "日志文件不存在" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Mark Build as Failed if Needed
+      if: steps.build.outcome == 'failure'
+      run: exit 1
+
+    # 始终上传完整日志
     - name: Upload Build Log
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: CupsPrintClient-Build-Log
-        path: build_log.txt
+        path: build_log_full.txt
+        retention-days: 7
 
-    # 只有在前置步骤全部成功且推送版本标签时，才自动创建 GitHub Release 并上传编译产物
+    - name: Upload APK Artifact
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: CupsPrintClient-Debug-APK
+        path: build/app/outputs/flutter-apk/app-debug.apk
+        retention-days: 30
+
     - name: Create GitHub Release
       if: success() && startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2

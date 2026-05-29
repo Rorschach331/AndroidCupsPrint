@@ -91,6 +91,7 @@ class _MainConsolePageState extends State<MainConsolePage> {
     _initSharingIntent();
     _initNsdDiscovery(); // 初始化并启动局域网 mDNS 自动搜寻
     _startStatusMonitoring(); // 启动 IPP 硬件状态与排队定时侦听轮询
+    _autoFetchIfCrossNetwork(); // 异地组网场景：mDNS 无结果时自动单播拉取
   }
 
   @override
@@ -199,6 +200,27 @@ class _MainConsolePageState extends State<MainConsolePage> {
   Future<void> _stopNsdDiscovery() async {
     try {
       await platform.invokeMethod('stopNsdDiscovery');
+    } catch (_) {}
+  }
+
+  // mDNS 发现延迟等待后自动触发单播拉取（解决异地组网 mDNS 不可达场景）
+  Future<void> _autoFetchIfCrossNetwork() async {
+    await Future.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+    if (_discoveredPrinters.isNotEmpty) return; // mDNS 已有结果，走局域网
+    final ip = _ipController.text.trim();
+    if (ip.isEmpty || ip == '192.168.2.11') return; // 未配置有效 IP
+    // 静默拉取，只显示成功结果，不弹错误提示
+    try {
+      final List<dynamic>? printers = await platform.invokeMethod('fetchCupsPrinters', {
+        'ip': ip,
+        'port': _portController.text.trim(),
+      });
+      if (mounted && printers != null && printers.isNotEmpty) {
+        setState(() {
+          _serverPrinters = printers.cast<String>();
+        });
+      }
     } catch (_) {}
   }
 

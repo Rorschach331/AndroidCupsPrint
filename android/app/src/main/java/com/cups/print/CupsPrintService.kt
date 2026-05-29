@@ -44,11 +44,11 @@ class CupsPrintService : PrintService() {
         // 2. 异步启动协程，在后台 IO 线程中处理数据并上传，避免阻塞系统打印服务主进程
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 读取持久化保存的 CUPS 打印机配置
-                val prefs = getSharedPreferences("cups_print_prefs", Context.MODE_PRIVATE)
-                val ip = prefs.getString("ip", "192.168.2.11") ?: "192.168.2.11"
-                val port = prefs.getString("port", "631") ?: "631"
-                val queue = prefs.getString("queue", "HP105W") ?: "HP105W"
+                // 读取持久化保存的 CUPS 打印机配置（与 Flutter shared_preferences 插件共用同一文件）
+                val prefs = getSharedPreferences(packageName + "_preferences", Context.MODE_PRIVATE)
+                val ip = prefs.getString("cups_ip", "192.168.2.11") ?: "192.168.2.11"
+                val port = prefs.getString("cups_port", "631") ?: "631"
+                val queue = prefs.getString("cups_queue", "HP105W") ?: "HP105W"
 
                 // 3. 动态拦截用户在 WPS 打印预览界面设置的“打印参数”
                 val copies = printJob.info.copies // 获取打印份数
@@ -159,11 +159,11 @@ class CupsPrintService : PrintService() {
         override fun onStartPrinterDiscovery(priorityList: List<PrinterId>) {
             Log.d(TAG_SESSION, "发现会话启动 -> 绕过局域网 mDNS 多播组播扫描限制！")
 
-            // 1. 直接从共享沙盒 SharedPreferences 中读取用户之前保存的持久化单播打印机
-            val prefs = service.getSharedPreferences("cups_print_prefs", Context.MODE_PRIVATE)
-            val ip = prefs.getString("ip", null)
-            val port = prefs.getString("port", "631")
-            val queue = prefs.getString("queue", null)
+            // 1. 从 Flutter shared_preferences 插件使用的默认文件读取持久化单播打印机
+            val prefs = service.getSharedPreferences(service.packageName + "_preferences", Context.MODE_PRIVATE)
+            val ip = prefs.getString("cups_ip", null)
+            val port = prefs.getString("cups_port", "631")
+            val queue = prefs.getString("cups_queue", null)
 
             if (ip != null && queue != null) {
                 Log.d(TAG_SESSION, "成功读取到持久化单播打印机配置: $queue @ $ip")

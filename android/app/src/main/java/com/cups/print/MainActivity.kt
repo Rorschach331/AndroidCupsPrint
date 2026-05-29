@@ -41,10 +41,10 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.cups.print/ipp"
     private var channelInstance: MethodChannel? = null
 
-    // NSD (mDNS/Bonjour) 服务搜索核心组件
+    // NSD (mDNS/Bonjour) 服务搜索核心组件（同时扫描明文和加密两种 IPP 服务类型）
     private var nsdManager: NsdManager? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
-    private val serviceType = "_ipp._tcp"
+    private val serviceTypes = listOf("_ipp._tcp", "_ipps._tcp")
 
     // 解决 Android 原生 NsdManager.resolveService 并发 Resolve 导致已经解析报错的“解析排队队列”
     private val resolveQueue = LinkedBlockingQueue<NsdServiceInfo>()
@@ -198,7 +198,7 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * 启动 mDNS / Bonjour 局域网广播搜寻
+     * 启动 mDNS / Bonjour 局域网广播搜寻（同时扫描 _ipp._tcp 和 _ipps._tcp）
      */
     private fun startNsdDiscovery() {
         if (nsdManager == null) {
@@ -214,12 +214,12 @@ class MainActivity : FlutterActivity() {
 
         discoveryListener = object : NsdManager.DiscoveryListener {
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-                Log.e(TAG, "启动服务发现失败，错误代码: $errorCode")
-                stopNsdDiscovery()
+                Log.e(TAG, "启动 $serviceType 发现失败，错误代码: $errorCode")
+                // 不立即 stop，让其他服务类型继续
             }
 
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
-                Log.e(TAG, "停止服务发现失败，错误代码: $errorCode")
+                Log.e(TAG, "停止 $serviceType 发现失败，错误代码: $errorCode")
                 nsdManager?.stopServiceDiscovery(this)
             }
 
@@ -228,11 +228,11 @@ class MainActivity : FlutterActivity() {
             }
 
             override fun onDiscoveryStopped(serviceType: String) {
-                Log.d(TAG, "局域网 mDNS/Bonjour 自动探测已成功关闭")
+                Log.d(TAG, "局域网 mDNS/Bonjour 自动探测已成功关闭 ($serviceType)")
             }
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
-                Log.d(TAG, "发现局域网服务节点: ${serviceInfo.serviceName}")
+                Log.d(TAG, "发现局域网服务节点: ${serviceInfo.serviceName} (${serviceInfo.serviceType})")
                 if (serviceInfo.serviceType.contains("ipp")) {
                     resolveQueue.add(serviceInfo)
                     processNextResolve()
@@ -244,7 +244,13 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        nsdManager?.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        for (type in serviceTypes) {
+            try {
+                nsdManager?.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+            } catch (e: Exception) {
+                Log.e(TAG, "启动 $type 发现异常: ${e.message}")
+            }
+        }
     }
 
     private fun stopNsdDiscovery() {
