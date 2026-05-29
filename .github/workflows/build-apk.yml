@@ -34,33 +34,19 @@ jobs:
         curl -sLo android/app/src/main/assets/docx-preview.min.js https://unpkg.com/docx-preview@0.1.15/dist/docx-preview.min.js
         curl -sLo android/app/src/main/assets/xlsx.full.min.js https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js
 
-    - run: flutter pub get
-
-    - uses: actions/cache@v4
-      with:
-        path: ~/.gradle/caches
-        key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle.properties') }}
-        restore-keys: gradle-${{ runner.os }}-
-
     - name: Generate Gradle Wrapper
-      run: |
-        flutter create --platforms=android _tmp
-        cp _tmp/android/gradlew _tmp/android/gradlew.bat android/
-        chmod +x android/gradlew
-        mkdir -p android/gradle/wrapper
-        cp _tmp/android/gradle/wrapper/gradle-wrapper.jar android/gradle/wrapper/
-        rm -rf _tmp
-        echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
-        echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.1.1-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: 8.1.1
 
     - name: Build APK
       id: build
       continue-on-error: true
       shell: bash
       run: |
+        # 生成 wrapper 到 android/ 目录
+        cd android && gradle wrapper --gradle-version 8.1.1 && cd ..
+        flutter pub get
         flutter build apk --debug 2>&1 | tee build.log
         exit ${PIPESTATUS[0]}
 
@@ -68,7 +54,7 @@ jobs:
       if: failure()
       run: |
         {
-          echo "### \ud83d\udccb Build Errors"
+          echo "### Errors"
           echo '```'
           grep -i -E "FAILURE:|BUILD FAILED|A failure occurred|Could not isolate" build.log | head -30
           echo ''
