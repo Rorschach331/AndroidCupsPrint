@@ -59,14 +59,14 @@ jobs:
         mkdir -p android/gradle/wrapper
         echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
         echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
+        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.1.1-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
         echo "networkTimeout=10000" >> android/gradle/wrapper/gradle-wrapper.properties
         echo "validateDistributionUrl=true" >> android/gradle/wrapper/gradle-wrapper.properties
         echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
         echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar" -o android/gradle/wrapper/gradle-wrapper.jar
-        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew" -o android/gradlew
-        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradlew.bat" -o android/gradlew.bat
+        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradle/wrapper/gradle-wrapper.jar" -o android/gradle/wrapper/gradle-wrapper.jar
+        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradlew" -o android/gradlew
+        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradlew.bat" -o android/gradlew.bat
         chmod +x android/gradlew
 
     # 分两步构建：先分离 Gradle 错误到单独文件
