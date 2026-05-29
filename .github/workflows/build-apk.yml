@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  # 允许手动触发调试
   workflow_dispatch:
 
 jobs:
@@ -14,125 +13,84 @@ jobs:
       contents: write
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
+    - uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Set up Flutter 3.19
-      uses: subosito/flutter-action@v2
+    - uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.19.x'
         channel: 'stable'
         cache: true
 
-    - name: Flutter Doctor
-      run: flutter doctor -v
+    - run: flutter doctor -v
 
-    - name: Download Offline JS Engines
+    - name: Download JS Engines
       run: |
         mkdir -p android/app/src/main/assets
-        curl -L -o android/app/src/main/assets/docx-preview.min.js https://unpkg.com/docx-preview@0.1.15/dist/docx-preview.min.js
-        curl -L -o android/app/src/main/assets/xlsx.full.min.js https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js
+        curl -sLo android/app/src/main/assets/docx-preview.min.js https://unpkg.com/docx-preview@0.1.15/dist/docx-preview.min.js
+        curl -sLo android/app/src/main/assets/xlsx.full.min.js https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js
 
-    - name: Install Dependencies
-      run: flutter pub get
+    - run: flutter pub get
 
-    # Gradle 缓存加速后续构建
-    - name: Cache Gradle
-      uses: actions/cache@v4
+    - uses: actions/cache@v4
       with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
+        path: ~/.gradle/caches
         key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle.properties') }}
-        restore-keys: |
-          gradle-${{ runner.os }}-
+        restore-keys: gradle-${{ runner.os }}-
 
-    # 写入 Gradle Wrapper 配置文件（避开 YAML heredoc 缩进问题）
-    - name: Setup Gradle Wrapper
+    - name: Generate Gradle Wrapper
       run: |
-        mkdir -p android/gradle/wrapper
-        echo "distributionBase=GRADLE_USER_HOME" > android/gradle/wrapper/gradle-wrapper.properties
-        echo "distributionPath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.1.1-bin.zip" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "networkTimeout=10000" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "validateDistributionUrl=true" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "zipStoreBase=GRADLE_USER_HOME" >> android/gradle/wrapper/gradle-wrapper.properties
-        echo "zipStorePath=wrapper/dists" >> android/gradle/wrapper/gradle-wrapper.properties
-        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradle/wrapper/gradle-wrapper.jar" -o android/gradle/wrapper/gradle-wrapper.jar
-        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradlew" -o android/gradlew
-        curl -sL "https://raw.githubusercontent.com/gradle/gradle/v8.1.1/gradlew.bat" -o android/gradlew.bat
+        flutter create --platforms=android _tmp
+        cp _tmp/android/gradlew _tmp/android/gradlew.bat android/
+        cp -r _tmp/android/gradle/wrapper android/gradle/
         chmod +x android/gradlew
+        rm -rf _tmp
 
-    # 分两步构建：先分离 Gradle 错误到单独文件
-    - name: Build Debug APK
+    - name: Build APK
       id: build
       continue-on-error: true
+      shell: bash
       run: |
-        flutter build apk --debug -v 2>&1 | tee build_log_full.txt
-        # 退出码以 flutter 为准（pipe 会吞掉失败码）
+        flutter build apk --debug 2>&1 | tee build.log
         exit ${PIPESTATUS[0]}
 
-    # 智能错误提取：查找真正的原因行
-    - name: Extract Build Errors
-      if: always()
+    - name: Extract Errors
+      if: failure()
       run: |
-        echo "## 📋 构建诊断报告" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+        {
+          echo "### \ud83d\udccb Build Errors"
+          echo '```'
+          grep -i -E "FAILURE:|BUILD FAILED|A failure occurred|Could not isolate" build.log | head -30
+          echo ''
+          echo '--- tail 80 ---'
+          tail -80 build.log
+          echo '```'
+        } >> $GITHUB_STEP_SUMMARY
 
-        if [ -f build_log_full.txt ]; then
-          echo "### ❌ 编译错误摘要" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          # 提取常见的 Gradle/AGP/编译报错行
-          grep -n -i "FAILURE:" build_log_full.txt | head -30 >> $GITHUB_STEP_SUMMARY || true
-          grep -n -i "BUILD FAILED" build_log_full.txt | head -5 >> $GITHUB_STEP_SUMMARY || true
-          grep -n -i "A failure occurred" build_log_full.txt | head -10 >> $GITHUB_STEP_SUMMARY || true
-          grep -n -i "error:" build_log_full.txt | grep -v "warning:" | head -20 >> $GITHUB_STEP_SUMMARY || true
-          grep -n -i "Could not" build_log_full.txt | head -15 >> $GITHUB_STEP_SUMMARY || true
-          grep -n -i "Unresolved" build_log_full.txt | head -10 >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
+    - name: Upload Log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build.log
 
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔍 完整日志尾部（最后 80 行）" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -80 build_log_full.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-        else
-          echo "日志文件不存在" >> $GITHUB_STEP_SUMMARY
-        fi
-
-    - name: Mark Build as Failed if Needed
+    - name: Mark Failed
       if: steps.build.outcome == 'failure'
       run: exit 1
 
-    # 始终上传完整日志
-    - name: Upload Build Log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: CupsPrintClient-Build-Log
-        path: build_log_full.txt
-        retention-days: 7
-
-    - name: Upload APK Artifact
+    - uses: actions/upload-artifact@v4
       if: success()
-      uses: actions/upload-artifact@v4
       with:
         name: CupsPrintClient-Debug-APK
         path: build/app/outputs/flutter-apk/app-debug.apk
-        retention-days: 30
 
-    - name: Create GitHub Release
+    - uses: softprops/action-gh-release@v2
       if: success() && startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2
       with:
         files: build/app/outputs/flutter-apk/app-debug.apk
-        draft: false
-        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
